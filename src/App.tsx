@@ -6,6 +6,7 @@ import type { User } from 'firebase/auth';
 import AuthForm from '/home/user/regenflix/src/components/AuthForm';
 import HomePage from '/home/user/regenflix/src/components/HomePage';
 import SubscriptionPlansPage from '/home/user/regenflix/src/components/SubscriptionPlansPage';
+import LanguageSelector from '/home/user/regenflix/src/components/LanguageSelector';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -25,6 +26,7 @@ function App() {
   }
 
   return (
+    <>
     <Router>
       <Routes>
         <Route path="/login" element={<AuthForm />} />
@@ -43,7 +45,10 @@ function App() {
         />
         {/* Adicionar mais rotas protegidas aqui (Minha Biblioteca, Cursos, etc.) */}
       </Routes>
+
     </Router>
+    <LanguageSelector />
+    </>
   );
 }
 export default App;
