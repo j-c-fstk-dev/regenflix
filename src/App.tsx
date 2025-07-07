@@ -11,11 +11,15 @@ import HomePage from './components/HomePage';
 import SubscriptionPlansPage from './components/SubscriptionPlansPage';
 import LanguageSelector from './components/LanguageSelector';
 
-// Importar os novos componentes placeholder
+// Importar os componentes placeholder existentes
 import MyLibraryPage from './components/MyLibraryPage';
 import CoursesPage from './components/CoursesPage';
 import RegenPediaPage from './components/RegenPediaPage';
 import RegenMarketPage from './components/RegenMarketPage';
+
+// Importar os novos componentes placeholder de cursos
+import CourseDetailsPage from './components/CourseDetailsPage';
+import ContentPlayerPage from './components/ContentPlayerPage';
 
 
 function App() {
@@ -101,6 +105,7 @@ function App() {
       {/* O LanguageSelector pode ficar aqui para ser visível em todas as rotas */}
       <LanguageSelector />
       <Routes>
+        {/* Rotas Públicas */}
         <Route path="/login" element={<AuthForm />} />
         <Route path="/cadastro" element={<AuthForm />} />
         {/* Rota para a landing page (pode ser o AuthForm ou uma página estática) */}
@@ -115,7 +120,6 @@ function App() {
           path="/planos"
           element={user ? <SubscriptionPlansPage /> : <Navigate to="/login" replace />}
         />
-        {/* Novas Rotas para as páginas de recurso */}
         <Route
           path="/my-library"
           element={user ? <MyLibraryPage /> : <Navigate to="/login" replace />}
@@ -132,6 +136,20 @@ function App() {
           path="/regenmarket"
           element={user ? <RegenMarketPage /> : <Navigate to="/login" replace />}
         />
+        {/* Novas Rotas relacionadas a Cursos */}
+        {/* Rota para Detalhes do Curso (com parâmetro :courseId) */}
+        <Route
+          path="/courses/:courseId"
+          element={user ? <CourseDetailsPage /> : <Navigate to="/login" replace />}
+        />
+        {/* Rota para o Player de Conteúdo (com parâmetros para identificar a aula) */}
+        {/* Esta rota pode precisar de mais parâmetros (ex: /courses/:courseId/modules/:moduleId/lessons/:lessonId) dependendo de como você quer acessá-la */}
+        <Route
+          path="/player/:contentType/:contentId" // Exemplo: /player/video/youtubeId123 ou /player/pdf/pdfDocId456
+          element={user ? <ContentPlayerPage /> : <Navigate to="/login" replace />}
+        />
+
+
         {/* Adicionar mais rotas protegidas aqui conforme criarmos as páginas */}
       </Routes>
     </Router>
