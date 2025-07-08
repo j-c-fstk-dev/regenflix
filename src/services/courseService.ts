@@ -1,8 +1,6 @@
-// src/services/courseService.ts
-
 import { db } from '../firebaseConfig';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
-import type { Course } from '../types'; // Importar a interface Course
+import { collection, addDoc, getDocs, query, orderBy, Timestamp } from 'firebase/firestore'; // Importar getDocs, query, orderBy
+import type { Course } from '../types';
 
 /**
  * Cria um novo curso no Firestore.
@@ -12,7 +10,6 @@ import type { Course } from '../types'; // Importar a interface Course
  */
 export const createCourse = async (courseData: Omit<Course, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   try {
-    // Adicionar timestamps de criação e atualização
     const now = Timestamp.now();
     const courseDataWithTimestamps = {
       ...courseData,
@@ -20,16 +17,64 @@ export const createCourse = async (courseData: Omit<Course, 'id' | 'createdAt' |
       updatedAt: now,
     };
 
-    // Adicionar o documento à coleção 'courses'
     const docRef = await addDoc(collection(db, 'courses'), courseDataWithTimestamps);
 
     console.log("Novo curso criado com ID:", docRef.id);
-    return docRef.id; // Retornar o ID do novo documento
+    return docRef.id;
 
   } catch (error) {
     console.error("Erro ao criar curso:", error);
-    throw new Error("Falha ao criar o curso."); // Lançar um erro para ser tratado na UI
+    throw new Error("Falha ao criar o curso.");
   }
 };
 
-// Podemos adicionar outras funções aqui futuramente: getCourse, updateCourse, deleteCourse
+/**
+ * Busca uma lista de cursos do Firestore.
+ * Pode incluir filtros (ex: apenas publicados, em destaque).
+ * @returns Um array de objetos Course.
+ * @throws Erro se a busca falhar.
+ */
+export const getCourses = async (): Promise<Course[]> => {
+  try {
+    // Consulta para buscar cursos (ordenados por data de criação)
+    const coursesQuery = query(
+        collection(db, 'courses'),
+        // Alterado de orderBy('publishedAt', 'desc') para orderBy('createdAt', 'desc')
+        orderBy('createdAt', 'desc')
+    );
+
+    const querySnapshot = await getDocs(coursesQuery);
+
+    const coursesData: Course[] = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        // Mapeamento explícito para garantir a tipagem e consistência
+        return {
+            id: doc.id, // O ID do documento
+            title: data.title,
+            shortDescription: data.shortDescription,
+            longDescription: data.longDescription,
+            instructor: data.instructor,
+            coverImageUrl: data.coverImageUrl,
+            trailerVideoId: data.trailerVideoId || undefined,
+            categories: data.categories || [],
+            targetAudience: data.targetAudience,
+            prerequisites: data.prerequisites,
+            price: data.price || undefined,
+            isPublished: data.isPublished || false,
+            isFeatured: data.isFeatured || false,
+            modules: data.modules || [], // Assumindo que módulos são salvos como array
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt,
+        } as Course;
+    });
+
+    console.log("Cursos buscados:", coursesData);
+    return coursesData;
+
+  } catch (error) {
+    console.error("Erro ao buscar cursos:", error);
+    throw new Error("Falha ao carregar os cursos.");
+  }
+};
+
+// Podemos adicionar outras funções aqui futuramente: getCourseDetails, updateCourse, deleteCourse
