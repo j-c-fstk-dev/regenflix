@@ -5,7 +5,7 @@ import { getStorage } from 'firebase/storage';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCYx5WkH8gYxuPChyfTtGDX6rxblipaGow",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: "regenflix.firebaseapp.com",
   projectId: "regenflix",
   storageBucket: "regenflix.firebasestorage.app",
