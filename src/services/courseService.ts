@@ -1,6 +1,7 @@
 import { db } from '../firebaseConfig';
-import { collection, addDoc, getDocs, query, orderBy, Timestamp } from 'firebase/firestore'; // Importar getDocs, query, orderBy
-import type { Course } from '../types';
+import { collection, addDoc, getDocs, query, orderBy, doc, getDoc, Timestamp } from 'firebase/firestore';
+import type { Course } from '../types'; // Removida a importação de LocalizedString
+
 
 /**
  * Cria um novo curso no Firestore.
@@ -36,10 +37,8 @@ export const createCourse = async (courseData: Omit<Course, 'id' | 'createdAt' |
  */
 export const getCourses = async (): Promise<Course[]> => {
   try {
-    // Consulta para buscar cursos (ordenados por data de criação)
     const coursesQuery = query(
         collection(db, 'courses'),
-        // Alterado de orderBy('publishedAt', 'desc') para orderBy('createdAt', 'desc')
         orderBy('createdAt', 'desc')
     );
 
@@ -47,9 +46,8 @@ export const getCourses = async (): Promise<Course[]> => {
 
     const coursesData: Course[] = querySnapshot.docs.map(doc => {
         const data = doc.data();
-        // Mapeamento explícito para garantir a tipagem e consistência
         return {
-            id: doc.id, // O ID do documento
+            id: doc.id,
             title: data.title,
             shortDescription: data.shortDescription,
             longDescription: data.longDescription,
@@ -62,7 +60,7 @@ export const getCourses = async (): Promise<Course[]> => {
             price: data.price || undefined,
             isPublished: data.isPublished || false,
             isFeatured: data.isFeatured || false,
-            modules: data.modules || [], // Assumindo que módulos são salvos como array
+            modules: data.modules || [],
             createdAt: data.createdAt,
             updatedAt: data.updatedAt,
         } as Course;
@@ -77,4 +75,45 @@ export const getCourses = async (): Promise<Course[]> => {
   }
 };
 
-// Podemos adicionar outras funções aqui futuramente: getCourseDetails, updateCourse, deleteCourse
+/**
+ * Busca um único curso do Firestore pelo seu ID.
+ * @param courseId - O ID do curso a ser buscado.
+ * @returns Um objeto Course ou undefined se não for encontrado.
+ * @throws Erro se a busca falhar.
+ */
+export const getCourse = async (courseId: string): Promise<Course | undefined> => {
+  try {
+    const courseDocRef = doc(db, 'courses', courseId);
+    const courseDocSnap = await getDoc(courseDocRef);
+
+    if (courseDocSnap.exists()) {
+      const data = courseDocSnap.data();
+      console.log("Dados do curso buscado:", data);
+      return {
+          id: courseDocSnap.id,
+          title: data.title,
+          shortDescription: data.shortDescription,
+          longDescription: data.longDescription,
+          instructor: data.instructor,
+          coverImageUrl: data.coverImageUrl,
+          trailerVideoId: data.trailerVideoId || undefined,
+          categories: data.categories || [],
+          targetAudience: data.targetAudience,
+          prerequisites: data.prerequisites,
+          price: data.price || undefined,
+          isPublished: data.isPublished || false,
+          isFeatured: data.isFeatured || false,
+          modules: data.modules || [],
+          createdAt: data.createdAt,
+          updatedAt: data.updatedAt,
+      } as Course;
+    } else {
+      console.log("Curso não encontrado com ID:", courseId);
+      return undefined;
+    }
+
+  } catch (error) {
+    console.error(`Erro ao buscar curso com ID ${courseId}:`, error);
+    throw new Error(`Falha ao carregar os detalhes do curso ${courseId}.`);
+  }
+};

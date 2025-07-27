@@ -23,6 +23,24 @@ function AuthForm() {
 
   const navigate = useNavigate();
 
+  // Função auxiliar para redirecionar (mantive, pois é uma boa prática)
+  const redirectToUserSpecificPage = async (uid: string) => {
+    const userDocRef = doc(db, 'users', uid);
+    const userDocSnap = await getDoc(userDocRef);
+
+    if (userDocSnap.exists()) {
+      const userData = userDocSnap.data();
+      // Exemplo de uso do campo isAdmin, caso você venha a implementá-lo
+      if (userData?.isAdmin) {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/home');
+      }
+    } else {
+      navigate('/home');
+    }
+  };
+
   const handleEmailAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setMessage('');
@@ -46,7 +64,7 @@ function AuthForm() {
           receivesNewsletter: receivesNewsletter,
           preferredLanguage: navigator.language || 'pt-BR',
           subscriptionStatus: 'none',
-          isAdmin: false,
+          isAdmin: false, // Usuário não admin por padrão
         });
         setMessage('Conta criada! Um e-mail de verificação foi enviado. Por favor, verifique sua caixa de entrada e tente fazer login.');
         setIsLogin(true);
@@ -57,8 +75,7 @@ function AuthForm() {
         await setDoc(doc(db, 'users', user.uid), { lastLoginAt: Timestamp.now() }, { merge: true });
 
         setMessage('Login realizado com sucesso!');
-        // TODO: Redirecionar para a tela de planos se não for assinante, ou para home se for.
-        navigate('/home');
+        await redirectToUserSpecificPage(user.uid);
       }
     } catch (error: any) {
       console.error("Erro na autenticação:", error.code, error.message);
@@ -70,6 +87,14 @@ function AuthForm() {
     setMessage('');
     try {
       const provider = new GoogleAuthProvider();
+
+      // --- AQUI ESTÁ A MUDANÇA PRINCIPAL ---
+      // Força o Google a pedir para o usuário selecionar uma conta
+      provider.setCustomParameters({
+        prompt: 'select_account'
+      });
+      // ------------------------------------
+
       const userCredential = await signInWithPopup(auth, provider);
       const user = userCredential.user;
 
@@ -85,15 +110,14 @@ function AuthForm() {
           preferredLanguage: navigator.language || 'pt-BR',
           receivesNewsletter: false,
           subscriptionStatus: 'none',
-          isAdmin: false,
+          isAdmin: false, // Novo usuário Google não admin por padrão
         });
       } else {
         await setDoc(userDocRef, { lastLoginAt: Timestamp.now() }, { merge: true });
       }
 
       setMessage('Login com Google realizado com sucesso!');
-       // TODO: Redirecionar para a tela de planos se não for assinante, ou para home se for.
-      navigate('/home');
+      await redirectToUserSpecificPage(user.uid);
     } catch (error: any) {
       console.error("Erro ao fazer login com Google:", error.code, error.message);
       setMessage(`Erro ao fazer login com Google: ${error.message}`);
