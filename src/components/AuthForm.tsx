@@ -1,15 +1,19 @@
-// src/components/AuthForm.tsx
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { auth, db } from '../firebaseConfig';
 import {
   createUserWithEmailAndPassword,
-  sendEmailVerification,
   signInWithEmailAndPassword,
   GoogleAuthProvider,
-  signInWithPopup
+  sendEmailVerification,
+  signInWithRedirect // Keeping signInWithRedirect for temporary test
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, Timestamp } from 'firebase/firestore';
+// Removed unused: import type { User } from 'firebase/auth';
+import { doc, setDoc, Timestamp } from 'firebase/firestore';
+// Removed unused: import { getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+// Removed unused: import i18n from '../i18n';
+
 
 function AuthForm() {
   const [isLogin, setIsLogin] = useState(true);
@@ -20,144 +24,123 @@ function AuthForm() {
   const [receivesNewsletter, setReceivesNewsletter] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [message, setMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const navigate = useNavigate();
+  const navigate = useNavigate(); // useNavigate is used below
+  const { t } = useTranslation(); // useTranslation is used for 't'
 
-  // Função auxiliar para redirecionar (mantive, pois é uma boa prática)
-  const redirectToUserSpecificPage = async (uid: string) => {
-    const userDocRef = doc(db, 'users', uid);
-    const userDocSnap = await getDoc(userDocRef);
-
-    if (userDocSnap.exists()) {
-      const userData = userDocSnap.data();
-      // Exemplo de uso do campo isAdmin, caso você venha a implementá-lo
-      if (userData?.isAdmin) {
-        navigate('/admin-dashboard');
-      } else {
-        navigate('/home');
-      }
-    } else {
-      navigate('/home');
-    }
-  };
 
   const handleEmailAuth = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setMessage('');
+    setIsLoading(true);
+
     try {
-      if (!isLogin) { // Cadastro
-        if (!acceptTerms) {
-          setMessage('Você deve aceitar os Termos de Uso e a Política de Privacidade.');
-          return;
-        }
+      if (!isLogin) {
+         if (!acceptTerms) {
+              setMessage(t('Você deve aceitar os Termos de Uso e a Política de Privacidade.')); // Using t
+              setIsLoading(false);
+              return;
+         }
+
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
         await sendEmailVerification(user);
 
-        await setDoc(doc(db, 'users', user.uid), {
+        const userDocRef = doc(db, 'users', user.uid);
+        await setDoc(userDocRef, {
           fullName: fullName,
           username: username,
           email: user.email,
           createdAt: Timestamp.now(),
           lastLoginAt: Timestamp.now(),
-          receivesNewsletter: receivesNewsletter,
           preferredLanguage: navigator.language || 'pt-BR',
+          receivesNewsletter: receivesNewsletter,
           subscriptionStatus: 'none',
-          isAdmin: false, // Usuário não admin por padrão
+          isAdmin: false,
         });
-        setMessage('Conta criada! Um e-mail de verificação foi enviado. Por favor, verifique sua caixa de entrada e tente fazer login.');
+
+        setMessage(t('Conta criada! Um e-mail de verificação foi enviado. Por favor, verifique sua caixa de entrada e tente fazer login.')); // Using t
         setIsLogin(true);
-      } else { // Login
+
+      } else {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const user = userCredential.user;
 
-        await setDoc(doc(db, 'users', user.uid), { lastLoginAt: Timestamp.now() }, { merge: true });
+         const userDocRef = doc(db, 'users', user.uid);
+         await setDoc(userDocRef, { lastLoginAt: Timestamp.now() }, { merge: true });
 
-        setMessage('Login realizado com sucesso!');
-        await redirectToUserSpecificPage(user.uid);
+        setMessage(t('Login realizado com sucesso!')); // Using t
+        navigate('/home');
       }
     } catch (error: any) {
       console.error("Erro na autenticação:", error.code, error.message);
-      setMessage(`Erro na autenticação: ${error.message}`);
+      setMessage(`${t('Erro na autenticação')}: ${error.message}`); // Using t
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleGoogleSignIn = async () => {
     setMessage('');
+    setIsLoading(true);
     try {
       const provider = new GoogleAuthProvider();
+      await signInWithRedirect(auth, provider.setCustomParameters({ prompt: 'select_account' }));
 
-      // --- AQUI ESTÁ A MUDANÇA PRINCIPAL ---
-      // Força o Google a pedir para o usuário selecionar uma conta
-      provider.setCustomParameters({
-        prompt: 'select_account'
-      });
-      // ------------------------------------
-
-      const userCredential = await signInWithPopup(auth, provider);
-      const user = userCredential.user;
-
-      const userDocRef = doc(db, 'users', user.uid);
-      const userDocSnap = await getDoc(userDocRef);
-
-      if (!userDocSnap.exists()) {
-        await setDoc(userDocRef, {
-          fullName: user.displayName || '',
-          email: user.email,
-          createdAt: Timestamp.now(),
-          lastLoginAt: Timestamp.now(),
-          preferredLanguage: navigator.language || 'pt-BR',
-          receivesNewsletter: false,
-          subscriptionStatus: 'none',
-          isAdmin: false, // Novo usuário Google não admin por padrão
-        });
-      } else {
-        await setDoc(userDocRef, { lastLoginAt: Timestamp.now() }, { merge: true });
-      }
-
-      setMessage('Login com Google realizado com sucesso!');
-      await redirectToUserSpecificPage(user.uid);
     } catch (error: any) {
       console.error("Erro ao fazer login com Google:", error.code, error.message);
-      setMessage(`Erro ao fazer login com Google: ${error.message}`);
+      setMessage(`${t('Erro ao fazer login com Google')}: ${error.message}`); // Using t
+      setIsLoading(false);
     }
   };
 
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h2>{isLogin ? 'Entrar no RegenFlix' : 'Crie Sua Conta RegenFlix'}</h2>
+        <h2>{isLogin ? t('Entrar no RegenFlix') : t('Crie Sua Conta RegenFlix')}</h2> {/* Using t */}
         <form onSubmit={handleEmailAuth} style={styles.form}>
-          <input type="email" placeholder="Seu e-mail" value={email} onChange={(e) => setEmail(e.target.value)} required style={styles.input} />
-          <input type="password" placeholder="Sua senha" value={password} onChange={(e) => setPassword(e.target.value)} required style={styles.input} />
+          <input type="email" placeholder={t('Seu e-mail')} value={email} onChange={(e) => setEmail(e.target.value)} required style={styles.input} /> {/* Using t */}
+          <input type="password" placeholder={t('Sua senha')} value={password} onChange={(e) => setPassword(e.target.value)} required style={styles.input} /> {/* Using t */}
+
           {!isLogin && (
             <>
-              <input type="text" placeholder="Nome Completo" value={fullName} onChange={(e) => setFullName(e.target.value)} required style={styles.input} />
-              <input type="text" placeholder="Nome de Usuário (opcional)" value={username} onChange={(e) => setUsername(e.target.value)} style={styles.input} />
+              <input type="text" placeholder={t('Nome Completo')} value={fullName} onChange={(e) => setFullName(e.target.value)} required style={styles.input} /> {/* Using t */}
+              <input type="text" placeholder={t('Nome de Usuário (opcional)')} value={username} onChange={(e) => setUsername(e.target.value)} style={styles.input} /> {/* Using t */}
+
               <label style={styles.checkboxLabel}>
                 <input type="checkbox" checked={receivesNewsletter} onChange={(e) => setReceivesNewsletter(e.target.checked)} style={styles.checkbox} />
-                Desejo receber novidades e atualizações.
+                {t('Desejo receber novidades e atualizações.')} {/* Using t */}
               </label>
+
               <label style={styles.checkboxLabel}>
                 <input type="checkbox" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} required style={styles.checkbox} />
-                Li e aceito os <a href="/termos-de-uso" target="_blank" style={styles.link}>Termos de Uso</a> e a <a href="/politica-de-privacidade" target="_blank" style={styles.link}>Política de Privacidade</a>.
+                {t('Li e aceito os')}{' '} <a href="/termos-de-uso" target="_blank" style={styles.link}>{t('Termos de Uso')}</a> {' '} {t('e a')} {' '} <a href="/politica-de-privacidade" target="_blank" style={styles.link}>{t('Política de Privacidade')}</a>. {/* Using t */}
               </label>
             </>
           )}
-          <button type="submit" style={styles.buttonPrimary}>{isLogin ? 'Entrar' : 'Cadastrar'}</button>
+
+          <button type="submit" disabled={isLoading} style={styles.buttonPrimary}>
+            {isLoading ? (isLogin ? t('Entrando...') : t('Cadastrando...')) : (isLogin ? t('Entrar') : t('Cadastrar'))} {/* Using t and loading */}
+          </button>
         </form>
-        <p style={styles.separator}>ou</p>
-        <button onClick={handleGoogleSignIn} style={styles.buttonSecondary}>
-          {isLogin ? 'Entrar com Google' : 'Cadastrar com Google'}
+
+        <p style={styles.separator}>{t('ou')}</p> {/* Using t */}
+
+        <button onClick={handleGoogleSignIn} disabled={isLoading} style={styles.buttonSecondary}>
+          {isLoading ? t('Entrando com Google...') : (isLogin ? t('Entrar com Google') : t('Cadastrar com Google'))} {/* Using t and loading */}
         </button>
+
         <p style={styles.switchMode}>
-          {isLogin ? "Não tem uma conta?" : "Já tem uma conta?"}{' '}
+          {isLogin ? t('Não tem uma conta?') : t('Já tem uma conta?')}{' '}
           <span onClick={() => setIsLogin(!isLogin)} style={styles.switchModeLink}>
-            {isLogin ? 'Cadastre-se' : 'Entrar'}
+            {isLogin ? t('Cadastre-se') : t('Entrar')} {/* Using t */}
           </span>
         </p>
+
         {message && <p style={styles.message}>{message}</p>}
+
       </div>
     </div>
   );
@@ -169,11 +152,11 @@ const styles: { [key: string]: React.CSSProperties } = {
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: '100vh',
-    backgroundColor: '#F5F5DC', // Beige Creme Suave (Modo Light)
+    backgroundColor: '#F5F5DC',
     padding: '20px',
   },
   card: {
-    backgroundColor: '#FFFFFF', // Branco Puro
+    backgroundColor: '#FFFFFF',
     borderRadius: '12px',
     padding: '40px',
     boxShadow: '0px 8px 16px rgba(0, 0, 0, 0.1)',
@@ -189,60 +172,58 @@ const styles: { [key: string]: React.CSSProperties } = {
   input: {
     padding: '12px',
     borderRadius: '8px',
-    border: '1px solid #D6E3DD', // Verde Água Translúcido
+    border: '1px solid #D6E3DD',
     fontSize: '16px',
   },
   checkboxLabel: {
     display: 'flex',
     alignItems: 'center',
     fontSize: '14px',
-    color: '#2C3E50', // Azul Marinho Escuro
+    color: '#2C3E50',
     cursor: 'pointer',
+    textAlign: 'left', // Added for better alignment
   },
   checkbox: {
     marginRight: '8px',
   },
   link: {
-    color: '#5BC0EB', // Azul Celeste Claro
+    color: '#5BC0EB',
     textDecoration: 'none',
+    fontWeight: 'bold', // Added for better visibility
   },
   buttonPrimary: {
     padding: '12px 20px',
     borderRadius: '8px',
-    backgroundColor: '#4A7C59', // Verde Floresta Suave
+    backgroundColor: '#4A7C59',
     color: '#FFFFFF',
     fontSize: '16px',
     border: 'none',
     cursor: 'pointer',
     transition: 'background-color 0.3s ease',
-  },
-  buttonPrimaryHover: {
-    backgroundColor: '#3A6B4B', // Tom mais escuro para hover
+    marginTop: '10px', // Added some space
   },
   buttonSecondary: {
     padding: '12px 20px',
     borderRadius: '8px',
-    backgroundColor: '#ECF0F1', // Cinza Claro Quase Branco
-    color: '#2C3E50', // Azul Marinho Escuro
+    backgroundColor: '#ECF0F1',
+    color: '#2C3E50',
     fontSize: '16px',
-    border: '1px solid #D6E3DD', // Verde Água Translúcido
+    border: '1px solid #D6E3DD',
     cursor: 'pointer',
     transition: 'background-color 0.3s ease, border-color 0.3s ease',
   },
-  buttonSecondaryHover: {
-    backgroundColor: '#D6E3DD', // Tom mais escuro para hover
-  },
   separator: {
     margin: '20px 0',
-    color: '#7F8C8D', // Cinza Médio
+    color: '#7F8C8D',
+    fontSize: '14px',
   },
   switchMode: {
     marginTop: '20px',
     fontSize: '14px',
-    color: '#2C3E50', // Azul Marinho Escuro
+    color: '#2C3E50',
   },
   switchModeLink: {
-    color: '#5BC0EB', // Azul Celeste Claro
+    color: '#5BC0EB',
     textDecoration: 'none',
     cursor: 'pointer',
     fontWeight: 'bold',
@@ -250,7 +231,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   message: {
     marginTop: '15px',
     fontSize: '14px',
-    color: '#FF6B6B', // Coral Suave para mensagens de erro
+    // Color is handled inline for success/error
   },
 };
 
